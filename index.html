@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clasificador de Frutas</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background:  #63fd60 ;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #000000;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .upload-area {
+            border: 3px dashed #e6f87e;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            margin-bottom: 20px;
+            background: #f9f9f9;
+        }
+        
+        .upload-area:hover {
+            border-color: #4f8f3f;
+        }
+        
+        .upload-area.dragover {
+            background: #e8e8ff;
+            border-color: #4f8f3f;
+        }
+        
+        .upload-text {
+            color: #4f8f3f;
+        }
+        
+        button {
+            width: 100%;
+            padding: 12px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        
+        button:hover {
+            background: #37a12d;
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .spinner {
+            border: 4px solid #f0f0f0;
+            border-top: 4px solid #2ebd3a;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        .result {
+            display: none;
+            background: #22c55e;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .result.error {
+            background: #ef4444;
+        }
+        
+        .image-preview {
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .image-preview img {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .error-message {
+            color: #ef4444;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Clasificador de imagenes</h1>
+        <p class="subtitle">Sube una imagen y aparecera tu predicción</p>
+        
+        <div class="upload-area" id="uploadArea">
+            <input type="file" id="fileInput" accept="image/*">
+        </div>
+        
+        <button id="uploadBtn" disabled>Analizar</button>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 15px; color: #667eea; font-size: 14px;">Analizando...</p>
+        </div>
+        
+        <div class="image-preview" id="imagePreview" style="display: none;">
+            <img id="previewImg" src="" alt="Preview">
+        </div>
+        
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('result');
+        const imagePreview = document.getElementById('imagePreview');
+        const previewImg = document.getElementById('previewImg');
+        
+        const API_URL = 'http://localhost:8000';
+        
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        fileInput.addEventListener('change', (e) => {
+            handleFile(e.target.files[0]);
+        });
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            handleFile(e.dataTransfer.files[0]);
+        });
+        
+        function handleFile(file) {
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImg.src = e.target.result;
+                imagePreview.style.display = 'block';
+                uploadBtn.disabled = false;
+                result.style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        uploadBtn.addEventListener('click', async () => {
+            const file = fileInput.files[0];
+            if (!file) return;
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            loading.style.display = 'block';
+            result.style.display = 'none';
+            uploadBtn.disabled = true;
+            
+            try {
+                const response = await fetch(`${API_URL}/predict`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResult(data);
+                } else {
+                    showError(data.error || 'Algo salió mal');
+                }
+            } catch (error) {
+                showError('Sin conexión al servidor');
+            } finally {
+                loading.style.display = 'none';
+                uploadBtn.disabled = false;
+            }
+        });
+        
+        function showResult(data) {
+            result.innerHTML = `<h3>Predicción: ${data.categoria}!</h3>`;
+            result.className = 'result';
+            result.style.display = 'block';
+        }
+        
+        function showError(message) {
+            result.innerHTML = `<h3>Oops! ${message}</h3>`;
+            result.className = 'result error';
+            result.style.display = 'block';
+        }
+        
+        window.addEventListener('load', async () => {
+            try {
+                await fetch(`${API_URL}/health`);
+            } catch (error) {
+                showError('Enciende el servidor!');
+            }
+        });
+    </script>
+</body>
+</html>

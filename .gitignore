@@ -1,5 +1,5 @@
 .vs
 .venv
-modelo_frutas.h5
+modelo_frutas.keras
 *.h5
 *.pkl
