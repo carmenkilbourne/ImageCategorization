@@ -245,13 +245,6 @@
             result.style.display = 'block';
         }
         
-        window.addEventListener('load', async () => {
-            try {
-                await fetch(`${API_URL}/health`);
-            } catch (error) {
-                showError('Enciende el servidor!');
-            }
-        });
     </script>
 </body>
 </html>
