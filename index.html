@@ -32,13 +32,15 @@
             color: #333;
             margin-bottom: 10px;
             font-size: 28px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
         }
         
         .subtitle {
             text-align: center;
-            color: #000000;
+            color: #666;
             margin-bottom: 30px;
             font-size: 14px;
+            font-style: italic;
         }
         
         .upload-area {
@@ -49,25 +51,34 @@
             cursor: pointer;
             margin-bottom: 20px;
             background: #f9f9f9;
+            transition: all 0.3s ease;
         }
         
         .upload-area:hover {
             border-color: #4f8f3f;
+            transform: scale(1.02);
         }
         
         .upload-area.dragover {
-            background: #e8e8ff;
-            border-color: #4f8f3f;
+            background: #e8f5e9;
+            border-color: #2ebd3a;
+            transform: scale(1.05);
         }
         
         .upload-text {
             color: #4f8f3f;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        
+        .upload-text p {
+            margin: 5px 0;
         }
         
         button {
             width: 100%;
             padding: 12px 20px;
-            background: #667eea;
+            background: #1ef85f;
             color: white;
             border: none;
             border-radius: 8px;
@@ -92,15 +103,7 @@
             margin: 20px 0;
         }
         
-        .spinner {
-            border: 4px solid #f0f0f0;
-            border-top: 4px solid #2ebd3a;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto;
-        }
+
         
         .result {
             display: none;
@@ -110,6 +113,12 @@
             border-radius: 8px;
             margin-top: 20px;
             text-align: center;
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
         .result.error {
@@ -140,14 +149,16 @@
         <p class="subtitle">Sube una imagen y aparecera tu predicción</p>
         
         <div class="upload-area" id="uploadArea">
-            <input type="file" id="fileInput" accept="image/*">
+            <div class="upload-text">
+                <p>Sube tu imagen aqui</p>
+            </div>
+            <input type="file" id="fileInput" accept="image/*" style="display: none;">
         </div>
         
         <button id="uploadBtn" disabled>Analizar</button>
         
         <div class="loading" id="loading">
-            <div class="spinner"></div>
-            <p style="margin-top: 15px; color: #667eea; font-size: 14px;">Analizando...</p>
+            <p style="color: #667eea; font-size: 14px;">Analizando...</p>
         </div>
         
         <div class="image-preview" id="imagePreview" style="display: none;">
@@ -158,91 +169,105 @@
     </div>
 
     <script>
-        const uploadArea = document.getElementById('uploadArea');
-        const fileInput = document.getElementById('fileInput');
-        const uploadBtn = document.getElementById('uploadBtn');
-        const loading = document.getElementById('loading');
-        const result = document.getElementById('result');
-        const imagePreview = document.getElementById('imagePreview');
-        const previewImg = document.getElementById('previewImg');
+        // elementos
+        let zona_suba = document.getElementById('uploadArea');
+        let inp_archivo = document.getElementById('fileInput');
+        let btn_enviar = document.getElementById('uploadBtn');
+        let div_cargando = document.getElementById('loading');
+        let div_resultado = document.getElementById('result');
+        let div_vista = document.getElementById('imagePreview');
+        let img_preview = document.getElementById('previewImg');
         
-        const API_URL = 'http://localhost:8000';
+        let url_servidor = 'http://localhost:8000';
         
-        uploadArea.addEventListener('click', () => fileInput.click());
+        let archivo_seleccionado = null;
         
-        fileInput.addEventListener('change', (e) => {
-            handleFile(e.target.files[0]);
+        // click en el area
+        zona_suba.addEventListener('click', () => {
+            inp_archivo.click();
         });
         
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
+        // cuando selecciona archivo
+        inp_archivo.addEventListener('change', (evt) => {
+            archivo_seleccionado = evt.target.files[0];
+            ver_preview(archivo_seleccionado);
         });
         
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
+        // drag over
+        zona_suba.addEventListener('dragover', (evt) => {
+            evt.preventDefault();
+            zona_suba.classList.add('dragover');
         });
         
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            handleFile(e.dataTransfer.files[0]);
+        // drag leave
+        zona_suba.addEventListener('dragleave', () => {
+            zona_suba.classList.remove('dragover');
         });
         
-        function handleFile(file) {
+        // drop
+        zona_suba.addEventListener('drop', (evt) => {
+            evt.preventDefault();
+            zona_suba.classList.remove('dragover');
+            archivo_seleccionado = evt.dataTransfer.files[0];
+            ver_preview(archivo_seleccionado);
+        });
+        
+        // mostrar preview
+        function ver_preview(f) {
+            if (!f) return;
             
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                previewImg.src = e.target.result;
-                imagePreview.style.display = 'block';
-                uploadBtn.disabled = false;
-                result.style.display = 'none';
+            let lector = new FileReader();
+            
+            lector.onload = (evt) => {
+                img_preview.src = evt.target.result;
+                div_vista.style.display = 'block';
+                btn_enviar.disabled = false;
+                div_resultado.style.display = 'none';
             };
-            reader.readAsDataURL(file);
+            
+            lector.readAsDataURL(f);
         }
         
-        uploadBtn.addEventListener('click', async () => {
-            const file = fileInput.files[0];
-            if (!file) return;
+        // cuando hace click en analizar
+        btn_enviar.addEventListener('click', async () => {
+            if (!archivo_seleccionado) {
+                return;
+            }
             
-            const formData = new FormData();
-            formData.append('file', file);
+            let form = new FormData();
+            form.append('file', archivo_seleccionado);
             
-            loading.style.display = 'block';
-            result.style.display = 'none';
-            uploadBtn.disabled = true;
+            div_cargando.style.display = 'block';
+            div_resultado.style.display = 'none';
+            btn_enviar.disabled = true;
             
             try {
-                const response = await fetch(`${API_URL}/predict`, {
+                let resp = await fetch(`${url_servidor}/predict`, {
                     method: 'POST',
-                    body: formData
+                    body: form
                 });
                 
-                const data = await response.json();
+                let info = await resp.json();
                 
-                if (response.ok) {
-                    showResult(data);
-                } else {
-                    showError(data.error || 'Algo salió mal');
+                if (resp.ok) {
+                    mostrar_exito(info);
                 }
-            } catch (error) {
-                showError('Sin conexión al servidor');
+            } catch (err) {
             } finally {
-                loading.style.display = 'none';
-                uploadBtn.disabled = false;
+                div_cargando.style.display = 'none';
+                btn_enviar.disabled = false;
             }
         });
         
-        function showResult(data) {
-            result.innerHTML = `<h3>Predicción: ${data.categoria}!</h3>`;
-            result.className = 'result';
-            result.style.display = 'block';
-        }
-        
-        function showError(message) {
-            result.innerHTML = `<h3>Oops! ${message}</h3>`;
-            result.className = 'result error';
-            result.style.display = 'block';
+        // devuelve predicción
+        function mostrar_exito(d) {
+            let fruta = d.categoria || 'algo';
+            
+            div_resultado.innerHTML = `
+                <h3>Es una: ${fruta}</h3>
+            `;
+            div_resultado.className = 'result';
+            div_resultado.style.display = 'block';
         }
         
     </script>
